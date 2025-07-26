@@ -1,0 +1,171 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import PchipInterpolator
+
+
+def natural_cubic_spline(x_nodes, y_nodes):
+    """
+    Oblicza współczynniki naturalnych splajnów sześciennych
+    Zwraca: a, b, c, d - współczynniki wielomianów sześciennych
+    """
+    n = len(x_nodes) - 1
+    h = np.diff(x_nodes)
+
+    # Obliczanie współczynników alpha
+    alpha = np.zeros(n)
+    for i in range(1, n):
+        alpha[i] = (3 / h[i]) * (y_nodes[i + 1] - y_nodes[i]) - (3 / h[i - 1]) * (y_nodes[i] - y_nodes[i - 1])
+
+    # Rozwiązanie układu równań dla c
+    l = np.ones(n + 1)
+    mu = np.zeros(n + 1)
+    z = np.zeros(n + 1)
+
+    for i in range(1, n):
+        l[i] = 2 * (x_nodes[i + 1] - x_nodes[i - 1]) - h[i - 1] * mu[i - 1]
+        mu[i] = h[i] / l[i]
+        z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i]
+
+    # Wsteczna substytucja
+    c = np.zeros(n + 1)
+    b = np.zeros(n)
+    d = np.zeros(n)
+
+    for j in range(n - 1, -1, -1):
+        c[j] = z[j] - mu[j] * c[j + 1]
+        b[j] = (y_nodes[j + 1] - y_nodes[j]) / h[j] - h[j] * (c[j + 1] + 2 * c[j]) / 3
+        d[j] = (c[j + 1] - c[j]) / (3 * h[j])
+
+    a = y_nodes[:-1]
+    return a, b, c[:-1], d
+
+
+def create_spline_function(x_nodes, y_nodes, method='natural'):
+    """
+    Tworzy funkcję interpolującą na podstawie wybranej metody
+    """
+    if method == 'natural':
+        a, b, c, d = natural_cubic_spline(x_nodes, y_nodes)
+
+        def spline_function(x):
+            x = np.asarray(x) if isinstance(x, (list, tuple, np.ndarray)) else np.array([x])
+            y = np.zeros_like(x, dtype=float)
+
+            for i in range(len(x_nodes) - 1):
+                mask = (x >= x_nodes[i]) & (x <= x_nodes[i + 1])
+                if np.any(mask):
+                    dx = x[mask] - x_nodes[i]
+                    y[mask] = a[i] + b[i] * dx + c[i] * dx ** 2 + d[i] * dx ** 3
+
+            return y[0] if y.size == 1 else y
+
+        return spline_function
+
+    elif method == 'pchip':
+        pchip = PchipInterpolator(x_nodes, y_nodes)
+        return pchip
+
+    else:
+        raise ValueError("Dostępne metody: 'natural' lub 'pchip'")
+
+
+def plot_spline(x_nodes, y_nodes, spline_func, title):
+    """
+    Rysuje wykres interpolacji splajnami
+    """
+    x_fine = np.linspace(min(x_nodes), max(x_nodes), 1000)
+    y_fine = spline_func(x_fine)
+
+    # plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.set_xscale('log')
+
+    def min_to_hhmm(minutes, pos=None):
+        hh = int(minutes) // 60
+        mm = int(minutes) % 60
+        if hh > 12:
+            hh = hh % 12
+            return f"{hh:02d}:{mm:02d} PM"
+        else:
+            return f"{hh:02d}:{mm:02d} AM"
+
+    # Tworzymy formatter dla osi Y
+    ax = plt.gca()
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(min_to_hhmm))
+
+    plt.plot(x_nodes, y_nodes, 'ro', label='Węzły interpolacji')
+    plt.plot(x_fine, y_fine, '-', label='Interpolacja')
+
+    for i, (xi, yi) in enumerate(zip(x_nodes, y_nodes)):
+        plt.annotate(f'({xi}, {min_to_hhmm(yi)})',
+                     (xi, yi),
+                     textcoords="offset points",
+                     xytext=(0, 10),
+                     ha='center',
+                     fontsize=9,
+                     bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
+
+    plt.ylim(0, 1440)
+    plt.title(f'RiWC Flow of Time ({title})')
+    plt.xlabel('Rok [w rokach]')
+    plt.ylabel('Czas na zegarze')
+    # plt.legend()
+    plt.grid(True)
+    plt.savefig(f'{title}.png', dpi=300, bbox_inches='tight')
+    print(f"Wykres zapisano jako: {title}.png")
+    plt.show()
+    plt.close()
+
+def interpolate_with_splines(x, y, method='natural'):
+    """
+    Główna funkcja wykonująca interpolację wybraną metodą
+    """
+    x_nodes = np.array(x)
+    y_nodes = np.array(y)
+
+    # Sortowanie węzłów (ważne dla PCHIP)
+    sort_idx = np.argsort(x_nodes)
+    x_nodes = x_nodes[sort_idx]
+    y_nodes = y_nodes[sort_idx]
+
+    # Tworzenie funkcji interpolującej
+    spline_func = create_spline_function(x_nodes, y_nodes, method)
+
+    # Rysowanie wykresu
+    method_name = 'Splajn naturalny' if method == 'natural' else 'PCHIP'
+    plot_spline(x_nodes, y_nodes, spline_func, f"{method_name}")
+
+    return spline_func
+
+def minutes_to_hhmmss_ampm(minutes):
+    """Convert minutes to hh:mm:ss AM/PM format"""
+    total_seconds = int(minutes * 60)
+    hours = (total_seconds // 3600) % 24
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+
+    period = 'AM' if hours < 12 else 'PM'
+    display_hours = hours if hours <= 12 else hours - 12
+    if display_hours == 0:  # Handle midnight
+        display_hours = 12
+
+    return f"{display_hours:02d}:{minutes:02d}:{seconds:02d} {period}"
+
+# Przykładowe dane
+x = [-40000, -2650, 1500, 1870, 2050]
+y = [180, 9*60+34, 15*60, 19*60+30, 20*60+30]
+
+# Wykonanie interpolacji naturalnym splajnem
+print("Naturalny splajn sześcienny:")
+spline_natural = interpolate_with_splines(x, y, method='natural')
+
+natural_value = spline_natural(350)
+print(f"Wartość splajna w x=350: {minutes_to_hhmmss_ampm(natural_value)}")
+
+# Wykonanie interpolacji PCHIP
+print("\nPCHIP (monotoniczna interpolacja):")
+spline_pchip = interpolate_with_splines(x, y, method='pchip')
+
+interpolated_value = spline_pchip(350)
+print(f"Wartość PCHIP w x=350: {minutes_to_hhmmss_ampm(interpolated_value)}")
