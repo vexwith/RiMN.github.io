@@ -1,7 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.interpolate import PchipInterpolator
-
+import plotly.graph_objects as go
 
 def natural_cubic_spline(x_nodes, y_nodes):
     """
@@ -71,51 +70,104 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
 
 def plot_spline(x_nodes, y_nodes, spline_func, title):
     """
-    Rysuje wykres interpolacji splajnami
+    Creates an interactive spline interpolation plot using Plotly.
     """
-    x_fine = np.linspace(min(x_nodes), max(x_nodes), 1000)
+    x_fine = np.linspace(min(x_nodes), max(x_nodes), abs(min(x_nodes)) + abs(max(x_nodes)))
     y_fine = spline_func(x_fine)
 
-    # plt.figure(figsize=(10, 6))
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    ax.set_xscale('log')
-
-    def min_to_hhmm(minutes, pos=None):
+    # Convert minutes to HH:MM AM/PM format
+    def min_to_hhmm(minutes):
         hh = int(minutes) // 60
         mm = int(minutes) % 60
-        if hh > 12:
-            hh = hh % 12
-            return f"{hh:02d}:{mm:02d} PM"
-        else:
-            return f"{hh:02d}:{mm:02d} AM"
+        period = "AM" if hh < 12 else "PM"
+        hh = hh % 12
+        hh = 12 if hh == 0 and period == "PM" else hh  # Handle 0 as 12 AM/PM
+        return f"{hh:02d}:{mm:02d} {period}"
 
-    # Tworzymy formatter dla osi Y
-    ax = plt.gca()
-    ax.yaxis.set_major_formatter(plt.FuncFormatter(min_to_hhmm))
+    # Create the figure
+    fig = go.Figure()
 
-    plt.plot(x_nodes, y_nodes, 'ro', label='Węzły interpolacji')
-    plt.plot(x_fine, y_fine, '-', label='Interpolacja')
+    # Add spline curve
+    fig.add_trace(go.Scatter(
+        x=x_fine,
+        y=y_fine,
+        mode='lines',
+        name='Interpolacja',
+        line=dict(color='blue'),
+        hoverinfo='none'
+    ))
 
-    for i, (xi, yi) in enumerate(zip(x_nodes, y_nodes)):
-        plt.annotate(f'({xi}, {min_to_hhmm(yi)})',
-                     (xi, yi),
-                     textcoords="offset points",
-                     xytext=(0, 10),
-                     ha='center',
-                     fontsize=9,
-                     bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
+    # Add nodes (red circles)
+    for xi, yi in zip(x_nodes, y_nodes):
+        fig.add_trace(go.Scatter(
+            x=[xi],
+            y=[yi],
+            mode='markers+text',
+            marker=dict(color='red', size=10),
+            name='Węzły interpolacji',
+            text=[f"({xi}, {min_to_hhmm(yi)})"],
+            textposition='top center',
+            textfont=dict(size=10, color='black'),
+            hoverinfo='none',
+            showlegend=False
+        ))
 
-    plt.ylim(0, 1440)
-    plt.title(f'RiWC Flow of Time ({title})')
-    plt.xlabel('Rok [w rokach]')
-    plt.ylabel('Czas na zegarze')
-    # plt.legend()
-    plt.grid(True)
-    plt.savefig(f'{title}.png', dpi=300, bbox_inches='tight')
-    print(f"Wykres zapisano jako: {title}.png")
-    plt.show()
-    plt.close()
+    fig.add_trace(go.Scatter(
+        x=x_fine,
+        y=y_fine,
+        mode='none',  # Invisible trace for hover
+        hoverinfo='text',
+        hovertext=[f"({int(x)}, {minutes_to_hhmmss_ampm(y)})" for x, y in zip(x_fine, y_fine)],
+        showlegend=False
+    ))
+
+    # Customize layout
+    fig.update_layout(
+        title={
+            'text': f'RiWC Flow of Time ({title})',
+            'x': 0.5,
+            'xanchor': 'center',
+            'font': dict(size=20)
+        },
+        xaxis_title='Rok [w rokach]',
+        yaxis_title='Czas na zegarze',
+        yaxis_range=[0, 1440],
+        hovermode='x',
+        template='plotly_white',
+        updatemenus=[{
+            'type': 'buttons',
+            'direction': 'left',
+            'x': 0.0,
+            'y': -0.25,
+            'buttons': [
+                {
+                    'label': 'Linear Scale',
+                    'method': 'relayout',
+                    'args': [{'xaxis.type': 'linear', 'xaxis.title.text': 'Rok [w rokach]'}]
+                },
+                {
+                    'label': 'Log Scale',
+                    'method': 'relayout',
+                    'args': [{'xaxis.type': 'log', 'xaxis.title.text': 'Rok [w rokach]'}]
+                }
+            ]
+        }]
+    )
+    # Set initial axis to log (default)
+    fig.update_xaxes(type='linear')
+
+    # Custom y-axis tick formatting (minutes → HH:MM AM/PM)
+    fig.update_yaxes(
+        tickvals=np.linspace(0, 1440, 13),  # Every 2 hours
+        ticktext=[min_to_hhmm(x) for x in np.linspace(0, 1440, 13)]
+    )
+
+    # Save as interactive HTML
+    fig.write_html(f"{title}.html")
+    print(f"Interactive plot saved as: {title}.html")
+
+    # Show in notebook (optional)
+    fig.show()
 
 def interpolate_with_splines(x, y, method='natural'):
     """
@@ -147,7 +199,7 @@ def minutes_to_hhmmss_ampm(minutes):
 
     period = 'AM' if hours < 12 else 'PM'
     display_hours = hours if hours <= 12 else hours - 12
-    if display_hours == 0:  # Handle midnight
+    if display_hours == 0 and period == 'PM':  # Handle midnight
         display_hours = 12
 
     return f"{display_hours:02d}:{minutes:02d}:{seconds:02d} {period}"
