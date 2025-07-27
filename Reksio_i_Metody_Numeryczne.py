@@ -96,30 +96,37 @@ def plot_spline(x_nodes, y_nodes, spline_func, title):
         line=dict(color='blue'),
         hoverinfo='none'
     ))
+    # Add invisible trace for hover
+    fig.add_trace(go.Scatter(
+        x=x_fine,
+        y=y_fine,
+        mode='none',
+        hoverinfo='text',
+        hovertext=[f"({int(x)}, {minutes_to_hhmmss_ampm(y)})" for x, y in zip(x_fine, y_fine)],
+        showlegend=False
+    ))
 
-    # Add nodes (red circles)
+    # RED CIRCLES
+    fig.add_trace(go.Scatter(
+        x=x_nodes,
+        y=y_nodes,
+        mode='markers',
+        marker=dict(color='red', size=10),
+        hoverinfo='none',
+        showlegend=False
+    ))
     for xi, yi in zip(x_nodes, y_nodes):
         fig.add_trace(go.Scatter(
             x=[xi],
             y=[yi],
             mode='markers+text',
-            marker=dict(color='red', size=10),
-            name='Węzły interpolacji',
+            marker=dict(color='rgba(0,0,0,0)', size=10),
             text=[f"({xi}, {min_to_hhmm(yi)})"],
             textposition='top center',
             textfont=dict(size=10, color='black'),
             hoverinfo='none',
             showlegend=False
         ))
-
-    fig.add_trace(go.Scatter(
-        x=x_fine,
-        y=y_fine,
-        mode='none',  # Invisible trace for hover
-        hoverinfo='text',
-        hovertext=[f"({int(x)}, {minutes_to_hhmmss_ampm(y)})" for x, y in zip(x_fine, y_fine)],
-        showlegend=False
-    ))
 
     # Customize layout
     fig.update_layout(
@@ -165,6 +172,8 @@ def plot_spline(x_nodes, y_nodes, spline_func, title):
     # Save as interactive HTML
     fig.write_html(f"{title}.html")
     print(f"Interactive plot saved as: {title}.html")
+    if title == "PCHIP":
+        fig.write_html(f"index.html")
 
     # Show in notebook (optional)
     fig.show()
