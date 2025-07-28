@@ -111,22 +111,25 @@ def plot_spline(x_nodes, y_nodes, spline_func, title):
         x=x_nodes,
         y=y_nodes,
         mode='markers',
+        name='daty RiWC',
         marker=dict(color='red', size=10),
-        hoverinfo='none',
-        showlegend=False
+        hoverinfo='none'
     ))
+    date_names = ['Prehistoria', 'Egipt', 'Średniowiecze', 'Wiek XIX', 'Przyszłość']
+    i = 0
     for xi, yi in zip(x_nodes, y_nodes):
         fig.add_trace(go.Scatter(
             x=[xi],
             y=[yi],
             mode='markers+text',
+            name=date_names[i],
             marker=dict(color='rgba(0,0,0,0)', size=10),
             text=[f"({xi}, {min_to_hhmm(yi)})"],
             textposition='top center',
             textfont=dict(size=10, color='black'),
-            hoverinfo='none',
-            showlegend=False
+            hoverinfo='none'
         ))
+        i += 1
 
     # Customize layout
     fig.update_layout(
@@ -195,7 +198,7 @@ def interpolate_with_splines(x, y, method='natural'):
 
     # Rysowanie wykresu
     method_name = 'Splajn naturalny' if method == 'natural' else 'PCHIP'
-    plot_spline(x_nodes, y_nodes, spline_func, f"{method_name}")
+    plot_spline(x_nodes, y_nodes, spline_func, method_name)
 
     return spline_func
 
@@ -218,11 +221,11 @@ x = [-40000, -2650, 1500, 1870, 2050]
 y = [180, 9*60+34, 15*60, 19*60+30, 20*60+30]
 
 # Wykonanie interpolacji naturalnym splajnem
-print("Naturalny splajn sześcienny:")
-spline_natural = interpolate_with_splines(x, y, method='natural')
-
-natural_value = spline_natural(350)
-print(f"Wartość splajna w x=350: {minutes_to_hhmmss_ampm(natural_value)}")
+# print("Naturalny splajn sześcienny:")
+# spline_natural = interpolate_with_splines(x, y, method='natural')
+#
+# natural_value = spline_natural(350)
+# print(f"Wartość splajna w x=350: {minutes_to_hhmmss_ampm(natural_value)}")
 
 # Wykonanie interpolacji PCHIP
 print("\nPCHIP (monotoniczna interpolacja):")
