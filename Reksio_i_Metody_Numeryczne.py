@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.interpolate import PchipInterpolator
+from scipy.optimize import curve_fit
 import plotly.graph_objects as go
 
 def natural_cubic_spline(x_nodes, y_nodes):
@@ -63,6 +64,36 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
     elif method == 'pchip':
         pchip = PchipInterpolator(x_nodes, y_nodes)
         return pchip
+
+    elif method == 'fit':
+        x_fit = []
+        y_fit = []
+        weights = []
+
+        for (x_min, x_max), y in zip(x_ranges, y_nodes):
+            if x_min == x_max:
+                x_fit.append(x_min)
+                y_fit.append(y)
+                weights.append(1.0)
+            else:
+                x_fit.extend([x_min, x_max])
+                y_fit.extend([y, y])
+                weights.extend([0.5, 0.5])
+
+        sigma = 1 / np.sqrt(weights)
+
+        def exp_model(x, a, b, c):
+            return a * np.exp(b * x) + c
+
+        params, _ = curve_fit(
+            exp_model, x_fit, y_fit,
+            p0=[1, 0.0001, 0],
+            sigma=sigma,
+            maxfev=10000,
+            bounds=([-np.inf, -0.1, -np.inf], [np.inf, 0.1, np.inf]))
+
+        a, b, c = params
+        return lambda x: exp_model(x, a, b, c)
 
     else:
         raise ValueError("Dostępne metody: 'natural' lub 'pchip'")
@@ -193,11 +224,13 @@ def interpolate_with_splines(x, y, method='natural'):
     x_nodes = x_nodes[sort_idx]
     y_nodes = y_nodes[sort_idx]
 
+
+
     # Tworzenie funkcji interpolującej
     spline_func = create_spline_function(x_nodes, y_nodes, method)
 
     # Rysowanie wykresu
-    method_name = 'Splajn naturalny' if method == 'natural' else 'PCHIP'
+    method_name = 'Splajn naturalny' if method == 'natural' else 'PCHIP' if method == "pchip" else 'Fit curve'
     plot_spline(x_nodes, y_nodes, spline_func, method_name)
 
     return spline_func
@@ -219,6 +252,14 @@ def minutes_to_hhmmss_ampm(minutes):
 # Przykładowe dane
 x = [-40000, -2650, 1500, 1870, 2050]
 y = [180, 9*60+34, 15*60, 19*60+30, 20*60+30]
+
+x_ranges = [
+    (-40000, -30000),
+    (-2550, -2500),
+    (1503, 1506),
+    (1870, 1890),
+    (2049, 2050)
+]
 
 # Wykonanie interpolacji naturalnym splajnem
 # print("Naturalny splajn sześcienny:")
