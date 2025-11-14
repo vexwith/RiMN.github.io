@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 from scipy.optimize import curve_fit
+from scipy.optimize import least_squares
 import plotly.graph_objects as go
 
 def natural_cubic_spline(x_nodes, y_nodes):
@@ -44,17 +45,18 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
     """
     Tworzy funkcję interpolującą na podstawie wybranej metody
     """
+    cut_x = x_nodes[:5]
     if method == 'natural':
-        a, b, c, d = natural_cubic_spline(x_nodes, y_nodes)
+        a, b, c, d = natural_cubic_spline(cut_x, y_nodes)
 
         def spline_function(x):
             x = np.asarray(x) if isinstance(x, (list, tuple, np.ndarray)) else np.array([x])
             y = np.zeros_like(x, dtype=float)
 
-            for i in range(len(x_nodes) - 1):
-                mask = (x >= x_nodes[i]) & (x <= x_nodes[i + 1])
+            for i in range(len(cut_x) - 1):
+                mask = (x >= cut_x[i]) & (x <= cut_x[i + 1])
                 if np.any(mask):
-                    dx = x[mask] - x_nodes[i]
+                    dx = x[mask] - cut_x[i]
                     y[mask] = a[i] + b[i] * dx + c[i] * dx ** 2 + d[i] * dx ** 3
 
             return y[0] if y.size == 1 else y
@@ -81,9 +83,12 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
                 weights.extend([0.5, 0.5])
 
         sigma = 1 / np.sqrt(weights)
+        print(weights)
+        print(sigma)
 
         def exp_model(x, a, b, c):
-            return a * np.exp(b * x) + c
+            # return a * np.exp(b * x) + c
+            return a * np.arctan(b * x) + c
 
         params, _ = curve_fit(
             exp_model, x_fit, y_fit,
@@ -93,17 +98,91 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
             bounds=([-np.inf, -0.1, -np.inf], [np.inf, 0.1, np.inf]))
 
         a, b, c = params
+        print(f"Fitted parameters: a={a}, b={b}, c={c}")
         return lambda x: exp_model(x, a, b, c)
 
+        # def constrained_model(x, a, b, c, d):
+        #     return a * np.tanh(b * x + c) + d
+        #
+        # # Build representative points for fitting (use midpoints of x_ranges)
+        # x_fit = []
+        # y_fit = []
+        # for (x_min, x_max), y in zip(x_ranges, y_nodes):
+        #     if x_min == x_max:
+        #         # x_fit.append(x_min)
+        #         y_fit.append(y)
+        #     else:
+        #         # x_mid = (x_min + x_max) / 2
+        #         # x_fit.append(x_mid)
+        #         y_fit.append(y)
+        #
+        # x_fit = x_nodes
+        # y_fit = np.array(y_fit)
+        #
+        # bounds = ([-1e6, -0.1, -1e6, -1e6], [1e6, 0.1, 1e6, 1e6])
+        #
+        # def residuals(params):
+        #     a, b, c, d = params
+        #     return constrained_model(x_fit, a, b, c, d) - y_fit
+        #
+        # def fit_and_check():
+        #     # Try a random initialization each time
+        #     initial = [
+        #         np.random.uniform(-500, 500),  # a
+        #         np.random.uniform(-0.05, 0.05),  # b
+        #         np.random.uniform(-1000, 1000),  # c
+        #         np.random.uniform(-500, 2000)  # d
+        #     ]
+        #     result = least_squares(
+        #         residuals, initial, bounds=bounds,
+        #         xtol=1e-12, ftol=1e-12, gtol=1e-12, max_nfev=50000
+        #     )
+        #     return result.x, result.success
+        #
+        # # Retry loop until all constraints are satisfied
+        # max_attempts = 50
+        # for attempt in range(max_attempts):
+        #     params, success = fit_and_check()
+        #     a, b, c, d = params
+        #     all_ok = True
+        #
+        #     # Verify constraints for each range
+        #     for (x_min, x_max), y in zip(x_ranges, y_nodes):
+        #         xs = np.linspace(x_min, x_max, 100)
+        #         ys = constrained_model(xs, a, b, c, d)
+        #         if not (np.min(ys) <= y <= np.max(ys)):
+        #             all_ok = False
+        #             break
+        #
+        #     if all_ok:
+        #         print(f"Constraints satisfied after {attempt + 1} attempts.")
+        #         print(f"Fitted parameters: a={a}, b={b}, c={c}, d={d}")
+        #         break
+        # else:
+        #     print("Failed to satisfy constraints after multiple attempts.")
+        #
+        # return lambda x: constrained_model(np.array(x), a, b, c, d)
+
+
     else:
-        raise ValueError("Dostępne metody: 'natural' lub 'pchip'")
+        raise ValueError("Dostępne metody: 'natural', 'pchip' lub 'fit'")
 
 
 def plot_spline(x_nodes, y_nodes, spline_func, title):
     """
     Creates an interactive spline interpolation plot using Plotly.
     """
-    x_fine = np.linspace(min(x_nodes), max(x_nodes), abs(min(x_nodes)) + abs(max(x_nodes)))
+    # x_nodes = x_nodes[1:]
+    # x_nodes = x_nodes[:-1]
+    # y_nodes = y_nodes[1:]
+    # y_nodes = y_nodes[:-1]
+    #
+    # extrapolation = 10000
+    # left_lim = x_nodes[0] - extrapolation
+    # right_lim = x_nodes[-1] + extrapolation
+    # x_fine = np.linspace(left_lim, right_lim, int(abs(left_lim) + abs(right_lim))) #abs(min(x_nodes)) + abs(max(x_nodes))
+    cut_x = x_nodes[:5]
+    x_fine = np.linspace(min(cut_x), max(cut_x), abs(min(cut_x)) + abs(max(cut_x)))
     y_fine = spline_func(x_fine)
 
     # Convert minutes to HH:MM AM/PM format
@@ -250,15 +329,21 @@ def minutes_to_hhmmss_ampm(minutes):
     return f"{display_hours:02d}:{minutes:02d}:{seconds:02d} {period}"
 
 # Przykładowe dane
-x = [-40000, -2650, 1500, 1870, 2050]
+# x = [-9e+20, -40000, -2650, 1500, 1870, 2050, 9e+20]
+x = [-40000, -2550, 1500, 1890, 2050]
+# x = [0]*7
+# y = [0, 180, 9*60+34, 15*60, 19*60+30, 20*60+30, 24*60]
 y = [180, 9*60+34, 15*60, 19*60+30, 20*60+30]
 
+
 x_ranges = [
+    (-9e+20, -9e+20),
     (-40000, -30000),
     (-2550, -2500),
     (1503, 1506),
     (1870, 1890),
-    (2049, 2050)
+    (2049, 2050),
+    (9e+20, 9e+20)
 ]
 
 # Wykonanie interpolacji naturalnym splajnem
