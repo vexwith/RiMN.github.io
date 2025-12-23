@@ -45,7 +45,7 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
     """
     Tworzy funkcję interpolującą na podstawie wybranej metody
     """
-    cut_x = x_nodes[:5]
+    cut_x = x_nodes
     if method == 'natural':
         a, b, c, d = natural_cubic_spline(cut_x, y_nodes)
 
@@ -87,8 +87,8 @@ def create_spline_function(x_nodes, y_nodes, method='natural'):
         print(sigma)
 
         def exp_model(x, a, b, c):
-            # return a * np.exp(b * x) + c
-            return a * np.arctan(b * x) + c
+            return a * np.exp(b * x) + c
+            # return a * np.arctan(b * x) + c
 
         params, _ = curve_fit(
             exp_model, x_fit, y_fit,
@@ -177,12 +177,12 @@ def plot_spline(x_nodes, y_nodes, spline_func, title):
     # y_nodes = y_nodes[1:]
     # y_nodes = y_nodes[:-1]
     #
-    # extrapolation = 10000
-    # left_lim = x_nodes[0] - extrapolation
-    # right_lim = x_nodes[-1] + extrapolation
-    # x_fine = np.linspace(left_lim, right_lim, int(abs(left_lim) + abs(right_lim))) #abs(min(x_nodes)) + abs(max(x_nodes))
-    cut_x = x_nodes[:5]
-    x_fine = np.linspace(min(cut_x), max(cut_x), abs(min(cut_x)) + abs(max(cut_x)))
+    extrapolation = 10000
+    left_lim = x_nodes[0] - extrapolation
+    right_lim = x_nodes[-1] + extrapolation
+    x_fine = np.linspace(left_lim, right_lim, int(abs(left_lim) + abs(right_lim))) #abs(min(x_nodes)) + abs(max(x_nodes))
+    # cut_x = x_nodes
+    # x_fine = np.linspace(min(cut_x), max(cut_x), abs(min(cut_x)) + abs(max(cut_x)))
     y_fine = spline_func(x_fine)
 
     # Convert minutes to HH:MM AM/PM format
@@ -337,13 +337,13 @@ y = [180, 9*60+34, 15*60, 19*60+30, 20*60+30]
 
 
 x_ranges = [
-    (-9e+20, -9e+20),
+    # (-9e+20, -9e+20),
     (-40000, -30000),
     (-2550, -2500),
     (1503, 1506),
     (1870, 1890),
-    (2049, 2050),
-    (9e+20, 9e+20)
+    (2049, 2050)
+    # (9e+20, 9e+20)
 ]
 
 # Wykonanie interpolacji naturalnym splajnem
@@ -355,7 +355,7 @@ x_ranges = [
 
 # Wykonanie interpolacji PCHIP
 print("\nPCHIP (monotoniczna interpolacja):")
-spline_pchip = interpolate_with_splines(x, y, method='pchip')
+spline_pchip = interpolate_with_splines(x, y, method='fit')
 
 interpolated_value = spline_pchip(350)
 print(f"Wartość PCHIP w x=350: {minutes_to_hhmmss_ampm(interpolated_value)}")
